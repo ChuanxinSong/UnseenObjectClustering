@@ -93,6 +93,7 @@ class OCIDObject(data.Dataset, datasets.imdb):
         if 'table' in labels_filename:
             foreground_labels[foreground_labels == 2] = 0
         foreground_labels = self.process_label(foreground_labels)
+        foreground_labels = foreground_labels.astype(np.int32)  # 或者 np.int64
         label_blob = torch.from_numpy(foreground_labels).unsqueeze(0)
 
         index = filename.find('OCID')

@@ -71,7 +71,7 @@ def connected_components(Z, epsilon, metric='cosine'):
                 label = torch.tensor(K)
                 K += 1  # Increment number of clusters
 
-            cluster_labels[component_seeds] = label
+            cluster_labels[component_seeds] = label.cuda(device=cfg.device)
 
     return cluster_labels
 
@@ -219,7 +219,7 @@ def mean_shift_smart_init(X, kappa, num_seeds=100, max_iters=10, metric='cosine'
     count = torch.zeros(num, dtype=torch.long)
     for i in range(num):
         count[i] = (cluster_labels == i).sum()
-    label_max = torch.argmax(count)
+    label_max = torch.argmax(count).cuda(device=cfg.device)
     if label_max != 0:
         index1 = cluster_labels == 0
         index2 = cluster_labels == label_max
