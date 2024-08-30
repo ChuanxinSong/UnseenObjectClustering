@@ -32,7 +32,7 @@ import networks
 from utils.blob import add_noise, chromatic_transform
 from utils.evaluation import multilabel_metrics
 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 def parse_args():
     """
@@ -61,7 +61,7 @@ def parse_args():
     parser.add_argument(
         "--result_save_root", dest='result_save_root',
         type=str,
-        default="/media/user/data1/rcao/result/uois/PhoCAL/UCN_rgb_mask",
+        default="/media/user/data1/rcao/result/uois/Housecat6D/UCN_rgb_mask",
         help="path to save inference result"
     )
 
@@ -105,7 +105,7 @@ def test_segnet(network, output_dir, network_crop):
     depth_paths = []
     anno_paths = []
 
-    data_root = '/media/user/data1/dataset/PhoCAL'
+    data_root = '/media/user/data1/dataset/Housecat6D'
 
     data_list_path = os.path.join(data_root, "data_list.txt")
     # 读取 data_list.txt 文件
@@ -115,7 +115,7 @@ def test_segnet(network, output_dir, network_crop):
     for item in data_list:
         image_path = os.path.join(data_root, item)
         depth_path = image_path.replace('/rgb/', '/depth/')
-        anno_path = image_path.replace('/rgb/', '/mask/')
+        anno_path = image_path.replace('/rgb/', '/instance/')
 
         image_paths.append(image_path)
         depth_paths.append(depth_path)
@@ -131,10 +131,11 @@ def test_segnet(network, output_dir, network_crop):
         image_dir, image_name = rgb_path.split('/')[-3], os.path.basename(rgb_path).split('.')[0]
 
         im = cv2.imread(rgb_path)
-        if cfg.TRAIN.CHROMATIC and cfg.MODE == 'TRAIN' and np.random.rand(1) > 0.1:
-            im = chromatic_transform(im)
-        if cfg.TRAIN.ADD_NOISE and cfg.MODE == 'TRAIN' and np.random.rand(1) > 0.1:
-            im = add_noise(im)
+        im = cv2.resize(im, (640, 480))
+        # if cfg.TRAIN.CHROMATIC and cfg.MODE == 'TRAIN' and np.random.rand(1) > 0.1:
+        #     im = chromatic_transform(im)
+        # if cfg.TRAIN.ADD_NOISE and cfg.MODE == 'TRAIN' and np.random.rand(1) > 0.1:
+        #     im = add_noise(im)
         im_tensor = torch.from_numpy(im) / 255.0
 
         im_tensor_bgr = im_tensor.clone()

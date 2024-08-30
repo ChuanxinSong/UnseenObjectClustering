@@ -60,6 +60,12 @@ def parse_args():
     parser.add_argument('--network', dest='network_name',
                         help='name of the network',
                         default='seg_resnet34_8s_embedding', type=str)
+    parser.add_argument(
+        "--result_save_root", dest='result_save_root',
+        type=str,
+        default="/media/user/data1/rcao/result/uois/PhoCAL/UCN_rgbd_mask",
+        help="path to save inference result"
+    )
 
     # if len(sys.argv) == 1:
     #     parser.print_help()
@@ -184,7 +190,7 @@ def test_segnet(network, output_dir, network_crop):
         # Label
         foreground_labels = np.array(Image.open(anno_path))
         # mask table as background
-        foreground_labels[foreground_labels == 1] = 0
+        # foreground_labels[foreground_labels == 1] = 0
         foreground_labels = process_label(foreground_labels)
         foreground_labels = foreground_labels.astype(np.int32)  # 或者 np.int64
         label_blob = torch.from_numpy(foreground_labels).unsqueeze(0)
@@ -240,11 +246,20 @@ def test_segnet(network, output_dir, network_crop):
             # out_label = filter_labels_depth(out_label, depth, 0.8)
 
         # evaluation
-        gt = sample['label'].squeeze().numpy()
+        # gt = sample['label'].squeeze().numpy()
+        # prediction = out_label.squeeze().detach().cpu().numpy()
+        # metrics = multilabel_metrics(prediction, gt)
+        # metrics_all.append(metrics)
+        # print(metrics)
+
         prediction = out_label.squeeze().detach().cpu().numpy()
-        metrics = multilabel_metrics(prediction, gt)
-        metrics_all.append(metrics)
-        print(metrics)
+
+        # result save
+        prediction = (prediction / np.max(prediction)) * 255
+        result = Image.fromarray(prediction.astype(np.uint8))
+        mask_save_path = os.path.join(args.result_save_root, image_dir)
+        os.makedirs(mask_save_path, exist_ok=True)
+        result.save(os.path.join(mask_save_path, '{}.png'.format(image_name)))
 
         # zoom in refinement
         out_label_refined = None
@@ -260,60 +275,66 @@ def test_segnet(network, output_dir, network_crop):
             prediction_refined = out_label_refined.squeeze().detach().cpu().numpy()
         else:
             prediction_refined = prediction.copy()
-        metrics_refined = multilabel_metrics(prediction_refined, gt)
-        metrics_all_refined.append(metrics_refined)
-        print(metrics_refined)
+        # metrics_refined = multilabel_metrics(prediction_refined, gt)
+        # metrics_all_refined.append(metrics_refined)
+        # print(metrics_refined)
 
-        if cfg.TEST.VISUALIZE:
-            _vis_minibatch_segmentation(image, depth, label, out_label, out_label_refined, features, 
-                selected_pixels=selected_pixels, bbox=None)
-        else:
-            # save results
-            result = {'labels': prediction, 'labels_refined': prediction_refined, 'filename': sample['filename']}
-            filename = os.path.join(output_dir, '%06d.mat' % i)
-            print(filename)
-            scipy.io.savemat(filename, result, do_compression=True)
+        prediction_refined = (prediction_refined / np.max(prediction_refined)) * 255
+        result_zoomin = Image.fromarray(prediction_refined.astype(np.uint8))
+        mask_save_path = os.path.join(args.result_save_root.replace('_mask', '_zoomin_mask'), image_dir)
+        os.makedirs(mask_save_path, exist_ok=True)
+        result_zoomin.save(os.path.join(mask_save_path, '{}.png'.format(image_name)))
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        print('[%d/%d], batch time %.2f' % (i, epoch_size, batch_time.val))
+    #     if cfg.TEST.VISUALIZE:
+    #         _vis_minibatch_segmentation(image, depth, label, out_label, out_label_refined, features, 
+    #             selected_pixels=selected_pixels, bbox=None)
+    #     else:
+    #         # save results
+    #         result = {'labels': prediction, 'labels_refined': prediction_refined, 'filename': sample['filename']}
+    #         filename = os.path.join(output_dir, '%06d.mat' % i)
+    #         print(filename)
+    #         scipy.io.savemat(filename, result, do_compression=True)
 
-    # sum the values with same keys
-    print('========================================================')
-    result = {}
-    num = len(metrics_all)
-    print('%d images' % num)
-    print('========================================================')
-    for metrics in metrics_all:
-        for k in metrics.keys():
-            result[k] = result.get(k, 0) + metrics[k]
+    #     # measure elapsed time
+    #     batch_time.update(time.time() - end)
+    #     print('[%d/%d], batch time %.2f' % (i, epoch_size, batch_time.val))
 
-    for k in sorted(result.keys()):
-        result[k] /= num
-        print('%s: %f' % (k, result[k]))
+    # # sum the values with same keys
+    # print('========================================================')
+    # result = {}
+    # num = len(metrics_all)
+    # print('%d images' % num)
+    # print('========================================================')
+    # for metrics in metrics_all:
+    #     for k in metrics.keys():
+    #         result[k] = result.get(k, 0) + metrics[k]
 
-    print('%.6f' % (result['Objects Precision']))
-    print('%.6f' % (result['Objects Recall']))
-    print('%.6f' % (result['Objects F-measure']))
-    print('%.6f' % (result['Boundary Precision']))
-    print('%.6f' % (result['Boundary Recall']))
-    print('%.6f' % (result['Boundary F-measure']))
-    print('%.6f' % (result['obj_detected_075_percentage']))
+    # for k in sorted(result.keys()):
+    #     result[k] /= num
+    #     print('%s: %f' % (k, result[k]))
 
-    print('========================================================')
-    print(result)
-    print('====================Refined=============================')
+    # print('%.6f' % (result['Objects Precision']))
+    # print('%.6f' % (result['Objects Recall']))
+    # print('%.6f' % (result['Objects F-measure']))
+    # print('%.6f' % (result['Boundary Precision']))
+    # print('%.6f' % (result['Boundary Recall']))
+    # print('%.6f' % (result['Boundary F-measure']))
+    # print('%.6f' % (result['obj_detected_075_percentage']))
 
-    result_refined = {}
-    for metrics in metrics_all_refined:
-        for k in metrics.keys():
-            result_refined[k] = result_refined.get(k, 0) + metrics[k]
+    # print('========================================================')
+    # print(result)
+    # print('====================Refined=============================')
 
-    for k in sorted(result_refined.keys()):
-        result_refined[k] /= num
-        print('%s: %f' % (k, result_refined[k]))
-    print(result_refined)
-    print('========================================================')
+    # result_refined = {}
+    # for metrics in metrics_all_refined:
+    #     for k in metrics.keys():
+    #         result_refined[k] = result_refined.get(k, 0) + metrics[k]
+
+    # for k in sorted(result_refined.keys()):
+    #     result_refined[k] /= num
+    #     print('%s: %f' % (k, result_refined[k]))
+    # print(result_refined)
+    # print('========================================================')
 
 
 if __name__ == '__main__':
