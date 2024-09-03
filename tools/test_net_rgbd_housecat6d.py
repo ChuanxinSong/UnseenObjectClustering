@@ -63,7 +63,7 @@ def parse_args():
     parser.add_argument(
         "--result_save_root", dest='result_save_root',
         type=str,
-        default="/media/user/data1/rcao/result/uois/PhoCAL/UCN_rgbd_mask",
+        default="/media/user/data1/rcao/result/uois/Housecat6D/UCN_rgbd_mask",
         help="path to save inference result"
     )
 
@@ -147,7 +147,7 @@ def test_segnet(network, output_dir, network_crop):
     depth_paths = []
     anno_paths = []
 
-    data_root = '/media/user/data1/dataset/PhoCAL'
+    data_root = '/media/user/data1/dataset/Housecat6D'
 
     data_list_path = os.path.join(data_root, "data_list.txt")
     # 读取 data_list.txt 文件
@@ -157,7 +157,7 @@ def test_segnet(network, output_dir, network_crop):
     for item in data_list:
         image_path = os.path.join(data_root, item)
         depth_path = image_path.replace('/rgb/', '/depth/')
-        anno_path = image_path.replace('/rgb/', '/mask/')
+        anno_path = image_path.replace('/rgb/', '/instance/')
 
         image_paths.append(image_path)
         depth_paths.append(depth_path)
@@ -189,6 +189,8 @@ def test_segnet(network, output_dir, network_crop):
 
         # Label
         foreground_labels = np.array(Image.open(anno_path))
+
+        width, height = foreground_labels.shape[1], foreground_labels.shape[0]
         # mask table as background
         # foreground_labels[foreground_labels == 1] = 0
         foreground_labels = process_label(foreground_labels)
@@ -203,11 +205,16 @@ def test_segnet(network, output_dir, network_crop):
         
         # Depth image
         if cfg.INPUT == 'DEPTH' or cfg.INPUT == 'RGBD':
-            with open(os.path.join('/media/user/data1/dataset/PhoCAL', image_dir, 'scene_camera.json')) as f:
-                intrinsics_json = json.load(f)
-            intrinsics = intrinsics_json['rgb']
+            # with open(os.path.join('/media/user/data1/dataset/Housecat6D', image_dir, 'scene_camera.json')) as f:
+            #     intrinsics_json = json.load(f)
+            intrinsics = np.loadtxt(os.path.join('/media/user/data1/dataset/Housecat6D', image_dir, 'intrinsics.txt'))
+            factor_depth = 1000.0
+            camera_info = CameraInfo(width, height, intrinsics[0][0], intrinsics[1][1], intrinsics[0][2], intrinsics[1][2], factor_depth)
+
+
+            # intrinsics = intrinsics_json['rgb']
             depth = np.array(Image.open(depth_path), dtype=np.float32)
-            camera_info = CameraInfo(intrinsics['width'], intrinsics['height'], intrinsics['fx'], intrinsics['fy'], intrinsics['cx'], intrinsics['cy'], intrinsics['depth_scale'])
+            # camera_info = CameraInfo(intrinsics['width'], intrinsics['height'], intrinsics['fx'], intrinsics['fy'], intrinsics['cx'], intrinsics['cy'], intrinsics['depth_scale'])
             depth = create_point_cloud_from_depth_image(depth, camera_info, organized=True)
             depth[np.isnan(depth)] = 0
             depth_blob = torch.from_numpy(depth).permute(2, 0, 1) # 3xHxW
@@ -384,7 +391,7 @@ if __name__ == '__main__':
     #     print(dataset._intrinsic_matrix)
 
     # output_dir = get_output_dir(dataset, None)
-    output_dir = '/home/user/scx/Code/UnseenObjectClustering/output/tabletop_object/phocal'
+    output_dir = '/home/user/scx/Code/UnseenObjectClustering/output/tabletop_object/housecat6d'
     print('Output will be saved to `{:s}`'.format(output_dir))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
